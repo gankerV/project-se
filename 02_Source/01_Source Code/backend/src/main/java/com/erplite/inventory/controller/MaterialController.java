@@ -1,67 +1,57 @@
 package com.erplite.inventory.controller;
 
-import com.erplite.inventory.dto.MaterialRequestDTO;
-import com.erplite.inventory.dto.MaterialResponseDTO;
+import com.erplite.inventory.dto.common.PagedResponse;
+import com.erplite.inventory.dto.material.MaterialRequest;
+import com.erplite.inventory.dto.material.MaterialResponse;
 import com.erplite.inventory.entity.Material.MaterialType;
 import com.erplite.inventory.service.MaterialService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-
 @RestController
-@RequestMapping("/api/materials")
+@RequestMapping("/api/v1/materials")
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*")
 public class MaterialController {
 
     private final MaterialService materialService;
 
-    /**
-     * GET /api/materials
-     * Query params: keyword (optional), type (optional)
-     */
     @GetMapping
-    public ResponseEntity<List<MaterialResponseDTO>> getAllMaterials(
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<PagedResponse<MaterialResponse>> listMaterials(
             @RequestParam(required = false) String keyword,
-            @RequestParam(required = false) MaterialType type) {
-        return ResponseEntity.ok(materialService.getAllMaterials(keyword, type));
+            @RequestParam(required = false) MaterialType type,
+            @PageableDefault(size = 20, sort = "createdDate") Pageable pageable) {
+        return ResponseEntity.ok(materialService.listMaterials(keyword, type, pageable));
     }
 
-    /**
-     * GET /api/materials/{id}
-     */
     @GetMapping("/{id}")
-    public ResponseEntity<MaterialResponseDTO> getMaterialById(@PathVariable String id) {
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<MaterialResponse> getMaterial(@PathVariable String id) {
         return ResponseEntity.ok(materialService.getMaterialById(id));
     }
 
-    /**
-     * POST /api/materials
-     */
     @PostMapping
-    public ResponseEntity<MaterialResponseDTO> createMaterial(@Valid @RequestBody MaterialRequestDTO dto) {
-        MaterialResponseDTO created = materialService.createMaterial(dto);
-        return ResponseEntity.status(HttpStatus.CREATED).body(created);
+    @PreAuthorize("hasAnyRole('Admin','InventoryManager')")
+    public ResponseEntity<MaterialResponse> createMaterial(@Valid @RequestBody MaterialRequest req) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(materialService.createMaterial(req));
     }
 
-    /**
-     * PUT /api/materials/{id}
-     */
     @PutMapping("/{id}")
-    public ResponseEntity<MaterialResponseDTO> updateMaterial(
-            @PathVariable String id,
-            @Valid @RequestBody MaterialRequestDTO dto) {
-        return ResponseEntity.ok(materialService.updateMaterial(id, dto));
+    @PreAuthorize("hasAnyRole('Admin','InventoryManager')")
+    public ResponseEntity<MaterialResponse> updateMaterial(
+            @PathVariable String id, @Valid @RequestBody MaterialRequest req) {
+        return ResponseEntity.ok(materialService.updateMaterial(id, req));
     }
 
-    /**
-     * DELETE /api/materials/{id}
-     */
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('Admin')")
     public ResponseEntity<Void> deleteMaterial(@PathVariable String id) {
         materialService.deleteMaterial(id);
         return ResponseEntity.noContent().build();

@@ -1,12 +1,13 @@
 package com.erplite.inventory.entity;
 
+import com.erplite.inventory.converter.MaterialTypeConverter;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "materials")
+@Table(name = "Materials")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -23,8 +24,8 @@ public class Material {
     @Column(name = "material_name", nullable = false, length = 200)
     private String materialName;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "material_type", nullable = false, length = 20)
+    @Convert(converter = MaterialTypeConverter.class)
+    @Column(name = "material_type", nullable = false, length = 25)
     private MaterialType materialType;
 
     @Column(name = "storage_conditions", length = 255)
@@ -54,6 +55,6 @@ public class Material {
     }
 
     public enum MaterialType {
-        API, Excipient, Packaging, Product, Other
+        API, EXCIPIENT, DIETARY_SUPPLEMENT, CONTAINER, CLOSURE, PROCESS_CHEMICAL, TESTING_MATERIAL
     }
 }

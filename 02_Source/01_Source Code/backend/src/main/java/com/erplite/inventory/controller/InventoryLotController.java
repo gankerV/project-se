@@ -1,76 +1,124 @@
 package com.erplite.inventory.controller;
 
-import com.erplite.inventory.dto.InventoryLotRequestDTO;
-import com.erplite.inventory.dto.InventoryLotResponseDTO;
+import com.erplite.inventory.dto.common.PagedResponse;
+import com.erplite.inventory.dto.lot.*;
+import com.erplite.inventory.dto.transaction.TransactionResponse;
 import com.erplite.inventory.entity.InventoryLot.LotStatus;
-import com.erplite.inventory.entity.InventoryTransaction;
 import com.erplite.inventory.service.InventoryLotService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
-@RequestMapping("/api/lots")
+@RequestMapping("/api/v1/lots")
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*")
 public class InventoryLotController {
 
     private final InventoryLotService lotService;
 
-    /**
-     * GET /api/lots
-     * Query params: materialId (optional), status (optional)
-     */
     @GetMapping
-    public ResponseEntity<List<InventoryLotResponseDTO>> getLots(
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<PagedResponse<LotResponse>> listLots(
             @RequestParam(required = false) String materialId,
-            @RequestParam(required = false) LotStatus status) {
-        return ResponseEntity.ok(lotService.getLots(materialId, status));
+            @RequestParam(required = false) LotStatus status,
+            @RequestParam(required = false) Boolean nearExpiry,
+            @RequestParam(required = false) Boolean isSample,
+            @PageableDefault(size = 20, sort = "receivedDate") Pageable pageable) {
+        return ResponseEntity.ok(lotService.listLots(materialId, status, nearExpiry, isSample, pageable));
     }
 
-    /**
-     * GET /api/lots/{id}
-     */
     @GetMapping("/{id}")
-    public ResponseEntity<InventoryLotResponseDTO> getLotById(@PathVariable String id) {
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<LotResponse> getLot(@PathVariable String id) {
         return ResponseEntity.ok(lotService.getLotById(id));
     }
 
-    /**
-     * POST /api/lots/receive
-     * Tạo lot mới khi nhận hàng.
-     */
     @PostMapping("/receive")
-    public ResponseEntity<InventoryLotResponseDTO> receiveNewLot(
-            @Valid @RequestBody InventoryLotRequestDTO dto) {
-        InventoryLotResponseDTO created = lotService.receiveNewLot(dto);
-        return ResponseEntity.status(HttpStatus.CREATED).body(created);
+    @PreAuthorize("hasAnyRole('Admin','InventoryManager')")
+    public ResponseEntity<LotResponse> receiveLot(
+            @Valid @RequestBody LotReceiveRequest req,
+            @AuthenticationPrincipal Jwt jwt) {
+        if (req.getPerformedBy() == null) {
+            req.setPerformedBy(jwt.getClaimAsString("preferred_username"));
+        }
+        return ResponseEntity.status(HttpStatus.CREATED).body(lotService.receiveLot(req));
     }
 
-    /**
-     * PATCH /api/lots/{id}/status
-     * Body: { "status": "Accepted", "performedBy": "jdoe" }
-     */
     @PatchMapping("/{id}/status")
-    public ResponseEntity<InventoryLotResponseDTO> updateLotStatus(
+    @PreAuthorize("hasAnyRole('Admin','InventoryManager')")
+    public ResponseEntity<LotResponse> updateStatus(
             @PathVariable String id,
-            @RequestBody Map<String, String> body) {
-        LotStatus newStatus = LotStatus.valueOf(body.getOrDefault("status", ""));
-        String performedBy = body.get("performedBy");
-        return ResponseEntity.ok(lotService.updateLotStatus(id, newStatus, performedBy));
+            @Valid @RequestBody LotStatusUpdateRequest req,
+            @AuthenticationPrincipal Jwt jwt) {
+        if (req.getPerformedBy() == null) {
+            req.setPerformedBy(jwt.getClaimAsString("preferred_username"));
+        }
+        return ResponseEntity.ok(lotService.updateLotStatus(id, req));
     }
 
-    /**
-     * GET /api/lots/{id}/transactions
-     * Lịch sử giao dịch của lot.
-     */
-    @GetMapping("/{id}/transactions")
-    public ResponseEntity<List<InventoryTransaction>> getLotTransactions(@PathVariable String id) {
-        return ResponseEntity.ok(lotService.getLotTransactions(id));
+    @PostMapping("/{id}/split")
+    @PreAuthorize("hasAnyRole('Admin','InventoryManager','QualityControl')")
+    public ResponseEntity<LotResponse> splitLot(
+            @PathVariable String id,
+            @Valid @RequestBody LotSplitRequest req,
+            @AuthenticationPrincipal Jwt jwt) {
+        if (req.getPerformedBy() == null) {
+            req.setPerformedBy(jwt.getClaimAsString("preferred_username"));
+        }
+        return ResponseEntity.status(HttpStatus.CREATED).body(lotService.splitLot(id, req));
+    }
+
+    @PostMapping("/{id}/adjust")
+    @PreAuthorize("hasAnyRole('Admin','InventoryManager')")
+    public ResponseEntity<LotResponse> adjustLot(
+            @PathVariable String id,
+            @Valid @RequestBody LotAdjustRequest req,
+            @AuthenticationPrincipal Jwt jwt) {
+        if (req.getPerformedBy() == null) {
+            req.setPerformedBy(jwt.getClaimAsString("preferred_username"));
+        }
+        return ResponseEntity.ok(lotService.adjustLot(id, req));
+    }
+
+    @PostMapping("/{id}/transfer")
+    @PreAuthorize("hasAnyRole('Admin','InventoryManager')")
+    public ResponseEntity<LotResponse> transferLot(
+            @PathVariable String id,
+            @Valid @RequestBody LotTransferRequest req,
+            @AuthenticationPrincipal Jwt jwt) {
+        if (req.getPerformedBy() == null) {
+            req.setPerformedBy(jwt.getClaimAsString("preferred_username"));
+        }
+        return ResponseEntity.ok(lotService.transferLot(id, req));
+    }
+
+    @PostMapping("/{id}/dispose")
+    @PreAuthorize("hasAnyRole('Admin','InventoryManager')")
+    public ResponseEntity<LotResponse> disposeLot(
+            @PathVariable String id,
+            @Valid @RequestBody LotDisposeRequest req,
+            @AuthenticationPrincipal Jwt jwt) {
+        if (req.getPerformedBy() == null) {
+            req.setPerformedBy(jwt.getClaimAsString("preferred_username"));
+        }
+        return ResponseEntity.ok(lotService.disposeLot(id, req));
+    }
+
+    @GetMapping("/{lotId}/transactions")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<List<TransactionResponse>> getTransactions(
+            @PathVariable String lotId,
+            @RequestParam(required = false) String type) {
+        return ResponseEntity.ok(lotService.getTransactions(lotId, type));
     }
 }

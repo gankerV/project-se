@@ -119,7 +119,7 @@ export default function MaterialsPage() {
       if (keyword) params.keyword = keyword;
       if (typeFilter) params.type = typeFilter;
       const res = await materialApi.getAll(params);
-      setMaterials(res.data);
+      setMaterials(res.data.content ?? []);
     } catch (e) {
       setFetchError(e.response?.data?.message ?? 'Không thể tải danh sách vật tư');
     } finally {

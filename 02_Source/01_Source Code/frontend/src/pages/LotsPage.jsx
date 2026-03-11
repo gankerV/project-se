@@ -279,7 +279,7 @@ export default function LotsPage() {
       if (statusFilter) params.status = statusFilter;
       if (materialFilter) params.materialId = materialFilter;
       const res = await lotApi.getAll(params);
-      setLots(res.data);
+      setLots(res.data.content ?? res.data);
     } catch (e) {
       setFetchError(e.response?.data?.message ?? 'Không thể tải danh sách lot');
     } finally {
@@ -288,7 +288,7 @@ export default function LotsPage() {
   }, [statusFilter, materialFilter]);
 
   useEffect(() => {
-    materialApi.getAll().then((r) => setMaterials(r.data)).catch(() => {});
+    materialApi.getAll().then((r) => setMaterials(r.data.content ?? r.data)).catch(() => {});
   }, []);
 
   useEffect(() => { loadLots(); }, [loadLots]);

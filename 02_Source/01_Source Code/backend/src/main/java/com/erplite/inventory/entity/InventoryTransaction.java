@@ -7,7 +7,7 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "inventory_transactions")
+@Table(name = "InventoryTransactions")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -30,8 +30,14 @@ public class InventoryTransaction {
     @Column(name = "quantity", nullable = false, precision = 15, scale = 3)
     private BigDecimal quantity;
 
+    @Column(name = "unit_of_measure", nullable = false, length = 10)
+    private String unitOfMeasure;
+
     @Column(name = "transaction_date")
     private LocalDateTime transactionDate;
+
+    @Column(name = "created_date", updatable = false)
+    private LocalDateTime createdDate;
 
     @Column(name = "reference_id", length = 100)
     private String referenceId;
@@ -50,6 +56,7 @@ public class InventoryTransaction {
         if (transactionDate == null) {
             transactionDate = LocalDateTime.now();
         }
+        createdDate = LocalDateTime.now();
     }
 
     public enum TransactionType {

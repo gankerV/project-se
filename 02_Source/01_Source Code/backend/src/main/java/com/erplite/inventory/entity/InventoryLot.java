@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "inventory_lots")
+@Table(name = "InventoryLots")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -54,6 +54,21 @@ public class InventoryLot {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "parent_lot_id")
     private InventoryLot parentLot;
+
+    @Column(name = "manufacturer_name", length = 100)
+    private String manufacturerName;
+
+    @Column(name = "supplier_name", length = 100)
+    private String supplierName;
+
+    @Column(name = "in_use_expiration_date")
+    private LocalDate inUseExpirationDate;
+
+    @Column(name = "po_number", length = 30)
+    private String poNumber;
+
+    @Column(name = "receiving_form_id", length = 50)
+    private String receivingFormId;
 
     @Column(name = "created_date", updatable = false)
     private LocalDateTime createdDate;

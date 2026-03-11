@@ -1,7 +1,8 @@
 package com.erplite.inventory.service;
 
-import com.erplite.inventory.dto.MaterialRequestDTO;
-import com.erplite.inventory.dto.MaterialResponseDTO;
+import com.erplite.inventory.dto.common.PagedResponse;
+import com.erplite.inventory.dto.material.MaterialRequest;
+import com.erplite.inventory.dto.material.MaterialResponse;
 import com.erplite.inventory.entity.Material;
 import com.erplite.inventory.entity.Material.MaterialType;
 import com.erplite.inventory.exception.BusinessException;
@@ -9,11 +10,10 @@ import com.erplite.inventory.exception.ResourceNotFoundException;
 import com.erplite.inventory.repository.InventoryLotRepository;
 import com.erplite.inventory.repository.MaterialRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -23,96 +23,65 @@ public class MaterialService {
     private final MaterialRepository materialRepository;
     private final InventoryLotRepository inventoryLotRepository;
 
-    /**
-     * Lấy tất cả vật tư, hỗ trợ filter theo keyword và/hoặc type.
-     */
-    public List<MaterialResponseDTO> getAllMaterials(String keyword, MaterialType type) {
-        List<Material> materials;
-
+    public PagedResponse<MaterialResponse> listMaterials(String keyword, MaterialType type, Pageable pageable) {
+        Page<Material> page;
         if (keyword != null && !keyword.isBlank() && type != null) {
-            materials = materialRepository.findByMaterialTypeAndMaterialNameContainingIgnoreCase(type, keyword);
+            page = materialRepository.findByMaterialTypeAndMaterialNameContainingIgnoreCase(type, keyword, pageable);
         } else if (keyword != null && !keyword.isBlank()) {
-            materials = materialRepository.findByMaterialNameContainingIgnoreCase(keyword);
+            page = materialRepository.findByMaterialNameContainingIgnoreCase(keyword, pageable);
         } else if (type != null) {
-            materials = materialRepository.findByMaterialType(type);
+            page = materialRepository.findByMaterialType(type, pageable);
         } else {
-            materials = materialRepository.findAll();
+            page = materialRepository.findAll(pageable);
         }
-
-        return materials.stream()
-                .map(MaterialResponseDTO::fromEntity)
-                .collect(Collectors.toList());
+        return PagedResponse.from(page.map(MaterialResponse::from));
     }
 
-    /**
-     * Lấy vật tư theo ID.
-     */
-    public MaterialResponseDTO getMaterialById(String id) {
-        Material material = findMaterialOrThrow(id);
-        return MaterialResponseDTO.fromEntity(material);
+    public MaterialResponse getMaterialById(String id) {
+        return MaterialResponse.from(findMaterialOrThrow(id));
     }
 
-    /**
-     * Tạo vật tư mới. Kiểm tra part_number unique.
-     */
     @Transactional
-    public MaterialResponseDTO createMaterial(MaterialRequestDTO dto) {
-        if (materialRepository.existsByPartNumber(dto.getPartNumber())) {
-            throw new BusinessException("Part number already exists: " + dto.getPartNumber());
+    public MaterialResponse createMaterial(MaterialRequest req) {
+        if (materialRepository.existsByPartNumber(req.getPartNumber())) {
+            throw new BusinessException("Part number already exists: " + req.getPartNumber());
         }
-
         Material material = Material.builder()
-                .partNumber(dto.getPartNumber())
-                .materialName(dto.getMaterialName())
-                .materialType(dto.getMaterialType())
-                .storageConditions(dto.getStorageConditions())
-                .specificationDocument(dto.getSpecificationDocument())
-                .build();
-
-        return MaterialResponseDTO.fromEntity(materialRepository.save(material));
+            .partNumber(req.getPartNumber())
+            .materialName(req.getMaterialName())
+            .materialType(req.getMaterialType())
+            .storageConditions(req.getStorageConditions())
+            .specificationDocument(req.getSpecificationDocument())
+            .build();
+        return MaterialResponse.from(materialRepository.save(material));
     }
 
-    /**
-     * Cập nhật vật tư. Kiểm tra part_number unique (trừ chính nó).
-     */
     @Transactional
-    public MaterialResponseDTO updateMaterial(String id, MaterialRequestDTO dto) {
+    public MaterialResponse updateMaterial(String id, MaterialRequest req) {
         Material material = findMaterialOrThrow(id);
-
-        if (materialRepository.existsByPartNumberAndMaterialIdNot(dto.getPartNumber(), id)) {
-            throw new BusinessException("Part number already used by another material: " + dto.getPartNumber());
+        if (materialRepository.existsByPartNumberAndMaterialIdNot(req.getPartNumber(), id)) {
+            throw new BusinessException("Part number already used by another material: " + req.getPartNumber());
         }
-
-        material.setPartNumber(dto.getPartNumber());
-        material.setMaterialName(dto.getMaterialName());
-        material.setMaterialType(dto.getMaterialType());
-        material.setStorageConditions(dto.getStorageConditions());
-        material.setSpecificationDocument(dto.getSpecificationDocument());
-
-        return MaterialResponseDTO.fromEntity(materialRepository.save(material));
+        material.setPartNumber(req.getPartNumber());
+        material.setMaterialName(req.getMaterialName());
+        material.setMaterialType(req.getMaterialType());
+        material.setStorageConditions(req.getStorageConditions());
+        material.setSpecificationDocument(req.getSpecificationDocument());
+        return MaterialResponse.from(materialRepository.save(material));
     }
 
-    /**
-     * Xoá vật tư. Không cho phép nếu đã có lot liên kết.
-     */
     @Transactional
     public void deleteMaterial(String id) {
         findMaterialOrThrow(id);
-
         if (inventoryLotRepository.existsByMaterial_MaterialId(id)) {
             throw new BusinessException(
-                    "Cannot delete material with existing inventory lots. Deactivate the material instead.");
+                "Cannot delete material with existing inventory lots. Deactivate the material instead.");
         }
-
         materialRepository.deleteById(id);
     }
 
-    // -----------------------------------------------------------------------
-    // Internal helpers
-    // -----------------------------------------------------------------------
-
     private Material findMaterialOrThrow(String id) {
         return materialRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Material", "id", id));
+            .orElseThrow(() -> new ResourceNotFoundException("Material", "id", id));
     }
 }
